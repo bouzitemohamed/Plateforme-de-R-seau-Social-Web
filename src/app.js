@@ -4,9 +4,8 @@ const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require("cookie-parser");
-const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const authRoute=require("./routes/auth.route");
+const userRoute=require("./routes/user.route");
 const threadRoute=require("./routes/thread.route");
 const likeRouter=require("./routes/like.route");
 const followerRoute=require("./routes/follow.route");
@@ -30,11 +29,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(morgan('dev'));
-//app.use(mongoSanitize());
-//app.use(xss());
 app.use(express.json());
 app.use(cookieParser());
 app.use("/api/auth",authRoute);
+app.use("/api/user",userRoute);
 app.use("/api/thread",threadRoute);
 app.use("/api/like",likeRouter);
 app.use("/api/follower",followerRoute);

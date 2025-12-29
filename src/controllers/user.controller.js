@@ -64,7 +64,97 @@ const createUser = async (req, res) => {
     );
   }
 };
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return responseHandler.notFound(res, 'User');
+    }
+
+    const {
+      username,
+      email,
+      password,
+      isPrivate
+    } = req.body;
+
+    // Check username uniqueness
+    if (username && username !== user.username) {
+      const exists = await User.findOne({ username });
+      if (exists) {
+        return responseHandler.error(
+          res,
+          'Username already exists',
+          statusCodes.CONFLICT
+        );
+      }
+      user.username = username;
+    }
+
+    // Check email uniqueness
+    if (email && email.toLowerCase() !== user.email) {
+      const exists = await User.findOne({ email: email.toLowerCase() });
+      if (exists) {
+        return responseHandler.error(
+          res,
+          'Email already exists',
+          statusCodes.CONFLICT
+        );
+      }
+      user.email = email.toLowerCase();
+    }
+
+    // Update password
+    if (password) {
+      user.password = await hashPassword(password);
+    }
+
+    // Update privacy
+    if (typeof isPrivate === 'boolean') {
+      user.isPrivate = isPrivate;
+    }
+
+    // Update avatar
+    if (req.file) {
+      user.avatar = req.file.buffer;
+      user.avatarType = req.file.mimetype;
+    }
+
+    await user.save();
+
+    const userResponse = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      isPrivate: user.isPrivate,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      avatar: user.avatar
+        ? `data:${user.avatarType};base64,${user.avatar.toString('base64')}`
+        : null
+    };
+
+    return responseHandler.success(
+      res,
+      userResponse,
+      'Profile updated successfully',
+      statusCodes.UPDATED
+    );
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return responseHandler.error(
+      res,
+      'Failed to update profile',
+      statusCodes.INTERNAL_SERVER_ERROR,
+      process.env.NODE_ENV === 'development' ? error.message : undefined
+    );
+  }
+};
 
 module.exports = {
-  createUser
+  createUser,
+  updateProfile
 };
