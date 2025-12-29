@@ -1,6 +1,7 @@
 const app = require("./app");
 const envVar = require("./config/EnvVariable");
 const connectDB = require("./config/Db");
+require("./scripts/minioSetup");
 const http = require("http");
 const { initSocket } = require("./socket");
 

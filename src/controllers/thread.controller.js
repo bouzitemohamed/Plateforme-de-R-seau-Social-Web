@@ -3,10 +3,13 @@ const User = require('../models/user.model');
 const Like=require("../models/like.model");
 const responseHandler = require("../utils/responseHandler");
 const { statusCodes } = require("../utils/statusCodes");
-
+const minioClient = require('../config/minio');
+const envVar=require("../config/EnvVariable"); 
+const { v4: uuidv4 } = require('uuid'); 
 const createThread = async (req, res) => {
   try {
     const { content, parentThread } = req.body;
+
     if (!content || content.trim() === "") {
       return responseHandler.error(
         res,
@@ -14,6 +17,7 @@ const createThread = async (req, res) => {
         statusCodes.BAD_REQUEST
       );
     }
+
     if (parentThread) {
       const parent = await Thread.findById(parentThread);
       if (!parent) {
@@ -21,44 +25,55 @@ const createThread = async (req, res) => {
       }
     }
 
-    
     const threadData = {
       content: content.trim(),
-      author: req.user.id, 
+      author: req.user.id,
       parentThread: parentThread || null,
     };
 
-    
-   
     if (req.file) {
-    if (req.file.mimetype.startsWith("image")) {
-    threadData.media = {
-      type: "image",
-      data: req.file.buffer,
-      contentType: req.file.mimetype,
-    };
-    } else if (req.file.mimetype.startsWith("video")) {
-    // handle video externally
-   }
-  } else {
-  threadData.media = null;
-  }
+      if (req.file.mimetype.startsWith("image")) {
+        // Store image in MongoDB
+        threadData.media = {
+          type: "image",
+          data: req.file.buffer,
+          contentType: req.file.mimetype,
+        };
+      } else if (req.file.mimetype.startsWith("video")) {
+        // Store video in MinIO
+        const bucketName =envVar.MINIO_BUCKET;
+        const fileName = `${uuidv4()}-${req.file.originalname}`;
 
+        await minioClient.putObject(
+          bucketName,
+          fileName,
+          req.file.buffer,
+          req.file.size,
+          { 'Content-Type': req.file.mimetype }
+        );
 
+        // Store only URL in DB
+        const minioUrl = `${process.env.MINIO_URL || 'http://127.0.0.1:9000'}/${bucketName}/${fileName}`;
+        threadData.media = {
+          type: "video",
+          url: minioUrl,
+        };
+      }
+    } else {
+      threadData.media = null;
+    }
 
-    
     const thread = await Thread.create(threadData);
 
-    
     return responseHandler.success(
       res,
       thread,
       "Thread created successfully",
       statusCodes.CREATED
     );
+
   } catch (error) {
     console.error("Create thread error:", error);
-
     return responseHandler.error(
       res,
       null,
